@@ -29,6 +29,7 @@ https://github.com/user-attachments/assets/4c223e85-2916-494f-b7b1-766ce1bdc991
 - **Word overides and prompts** - Custom hot keys, common words, and more
 - **Multi-lingual** - Great performance in many languages
 - **Long form mode with saving** - Pause, think, resume, pause: submit... Bam!
+- **Hot-mic mode** - Keep the mic warm with a rolling pre-roll buffer for faster trigger-to-transcribe response
 - **Auto-paste anywhere** - Instant paste into any active buffer, or even auto enter (optional)
 - **Audio ducking 🦆** - Reduces system volume on record (optional)
 
@@ -82,6 +83,28 @@ hyprwhspr setup
 3. **Speak naturally**
 4. **Press `Super+Alt+D`** again to stop dictation - _boop!_
 5. **Bam!** Text appears in active buffer!
+
+### Hot-mic mode
+
+Hot-mic keeps the microphone capture warm in the background and stores only the most recent audio in a bounded rolling buffer. This reduces the delay between pressing the shortcut and having audio ready for transcription.
+
+To enable it:
+
+```json
+{
+  "recording_mode": "hot_mic",
+  "hot_mic_enabled": true,
+  "hot_mic_max_seconds": 30,
+  "primary_shortcut": "Super+Alt+D"
+}
+```
+
+Notes:
+
+- `hot_mic_max_seconds` controls how much recent audio is kept in memory
+- older chunks are dropped first to keep memory usage bounded
+- the default `primary_shortcut` still triggers dictation
+- if you want to turn it off, set `hot_mic_enabled` to `false` and use `recording_mode: "toggle"`
 
 Any snags, please [create an issue](https://github.com/goodroot/hyprwhspr/issues/new/choose).
 
