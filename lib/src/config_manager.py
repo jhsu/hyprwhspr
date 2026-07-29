@@ -75,7 +75,7 @@ class ConfigManager:
             'audio_device_model_id': None,  # USB model ID (most stable, from udev)
             'model': 'base',
             'language': None,       # Language code for transcription (None = auto-detect, or 'en', 'nl', 'fr', etc.)
-            'realtime_languages': None,  # Optional language hints for gpt-live-transcribe (e.g., ['en', 'fr'])
+            'realtime_languages': None,  # Optional explicit language hints for gpt-live-transcribe (e.g., ['en', 'fr'])
             'realtime_keywords': [],  # Optional keyword hints for gpt-live-transcribe
             'word_overrides': {'hyper whisper': 'hyprwhspr'},  # {"original": "replacement"}
             'filter_filler_words': False,  # Remove common filler words (uh, um, er, etc.)

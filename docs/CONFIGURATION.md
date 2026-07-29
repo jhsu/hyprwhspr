@@ -627,7 +627,7 @@ Two modes available (set `realtime_mode` in your config):
     "websocket_model": "gpt-live-transcribe",
     "realtime_mode": "transcribe",       // "transcribe" or "converse"
     "realtime_transcription_delay": "low", // "minimal", "low", "medium", "high", or "xhigh"
-    "realtime_languages": ["en"],         // Optional; overrides the singular language setting
+    "realtime_languages": ["en"],         // Optional; explicit hints, distinct from the singular language setting
     "realtime_keywords": ["AC-42"],       // Optional product names, acronyms, or domain terms
     "realtime_timeout": 30,              // Advanced: seconds to wait after stop for final transcript
     "realtime_buffer_max_seconds": 5     // Advanced: max unsent audio backlog (seconds) before dropping old chunks
@@ -637,9 +637,10 @@ Two modes available (set `realtime_mode` in your config):
 `gpt-live-transcribe` is the current OpenAI streaming transcription model. It
 uses the transcription WebSocket session and supports incremental transcript
 deltas, configurable latency, prompts, and language hints. The existing
-`language` setting is sent as a one-item `languages` list for this model.
-Use `realtime_languages` for multiple language hints and `realtime_keywords`
-for literal terms that may occur in the audio.
+When `realtime_languages` is set, it is used explicitly instead of the
+singular `language` setting. If it is omitted, `language` is sent as a
+one-item list. Use `realtime_keywords` for literal terms that may occur in
+the audio.
 
 #### Google Gemini
 

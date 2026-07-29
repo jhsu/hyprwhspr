@@ -226,8 +226,10 @@ class RealtimeWsBackend(TranscriptionBackend):
 
             language = self.config.get_setting('language', None)
             realtime_languages = self.config.get_setting('realtime_languages', None)
-            if capabilities['language_field'] == 'languages' and isinstance(realtime_languages, list):
-                self._realtime_client.language = realtime_languages or language
+            if capabilities['language_field'] == 'languages':
+                self._realtime_client.language = (
+                    realtime_languages if isinstance(realtime_languages, list) else language
+                )
             else:
                 self._realtime_client.language = language
             if language and not capabilities['supports_prompt']:

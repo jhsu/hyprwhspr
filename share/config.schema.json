@@ -117,7 +117,7 @@
       "type": ["array", "null"],
       "items": { "type": "string" },
       "default": null,
-      "description": "Language hints for OpenAI gpt-live-transcribe; when set, these replace the singular language setting"
+      "description": "Explicit language hints for OpenAI gpt-live-transcribe; when set, these replace the singular language setting"
     },
     "realtime_keywords": {
       "type": "array",
