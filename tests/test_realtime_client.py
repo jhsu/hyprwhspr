@@ -56,6 +56,51 @@ class RealtimeClientTests(unittest.TestCase):
             },
         )
 
+    def test_gpt_live_transcribe_session_payload(self):
+        client = self._client_with_ws("gpt-live-transcribe")
+        client.language = "en"
+        client.instructions = "Product names include AC-42."
+        client.keywords = ["AC-42", "premium plan"]
+        client.set_transcription_delay("medium")
+        client.ws.sent.clear()
+
+        client._send_session_update()
+
+        payload = client.ws.sent[-1]
+        session = payload["session"]
+        audio_input = session["audio"]["input"]
+
+        self.assertEqual(session["type"], "transcription")
+        self.assertEqual(audio_input["format"], {"type": "audio/pcm", "rate": 24000})
+        self.assertIsNone(audio_input["turn_detection"])
+        self.assertEqual(
+            audio_input["transcription"],
+            {
+                "model": "gpt-live-transcribe",
+                "languages": ["en"],
+                "prompt": "Product names include AC-42.",
+                "keywords": ["AC-42", "premium plan"],
+                "delay": "medium",
+            },
+        )
+
+    def test_gpt_live_transcribe_uses_standard_transcription_events(self):
+        client = self._client_with_ws("gpt-live-transcribe")
+        client._handle_event(
+            {
+                "type": "conversation.item.input_audio_transcription.delta",
+                "delta": "hello",
+            }
+        )
+        client._handle_event(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "transcript": "hello world",
+            }
+        )
+
+        self.assertEqual(client.commit_and_get_text(timeout=0.1), "hello world")
+
     def test_non_whisper_transcription_session_keeps_vad_and_configured_model(self):
         client = self._client_with_ws("gpt-4o-mini-transcribe")
         client.language = "fr"

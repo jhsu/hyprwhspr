@@ -91,6 +91,27 @@ class RealtimePreviewIntegrationTests(unittest.TestCase):
         self.assertIsNone(client.partial_transcript_callback)
         callback.assert_called_once_with("")
 
+    def test_openai_live_transcribe_enables_waveform_preview(self):
+        config = FakeConfig(
+            {
+                "transcription_backend": "realtime-ws",
+                "websocket_provider": "openai",
+                "websocket_model": "gpt-live-transcribe",
+                "realtime_mode": "transcribe",
+                "mic_osd_enabled": True,
+                "mic_osd_style": "waveform",
+            }
+        )
+        manager = WhisperManager(config_manager=config)
+        client = RealtimeClient(mode="transcribe")
+        manager._backend = RealtimeWsBackend(manager)
+        manager._backend._realtime_client = client
+
+        callback = mock.Mock()
+        manager.set_realtime_partial_callback(callback)
+
+        self.assertIs(client.partial_transcript_callback, callback)
+
 
 if __name__ == "__main__":
     unittest.main()

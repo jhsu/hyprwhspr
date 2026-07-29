@@ -12,6 +12,11 @@ try:
 except ImportError:
     from realtime_base import WebSocketRealtimeClientBase
 
+try:
+    from .realtime_model_capabilities import get_realtime_model_capabilities
+except ImportError:
+    from realtime_model_capabilities import get_realtime_model_capabilities
+
 
 class RealtimeClient(WebSocketRealtimeClientBase):
     """WebSocket client for the OpenAI Realtime transcription API"""
@@ -29,6 +34,7 @@ class RealtimeClient(WebSocketRealtimeClientBase):
         super().__init__(mode=mode)
         self.transcription_delay = 'low'
         self.partial_transcript_callback = None
+        self.keywords = []
         self.sample_rate = 24000  # OpenAI Realtime API requires 24kHz
 
         # Track if buffer was committed (by VAD or manual)
@@ -191,12 +197,23 @@ class RealtimeClient(WebSocketRealtimeClientBase):
             # Transcription-only session
             # Build transcription config - omit language for auto-detect
             model = self.model or 'gpt-4o-mini-transcribe'
+            capabilities = get_realtime_model_capabilities(model)
             transcription_config = {'model': model}
             if self.language:
-                transcription_config['language'] = self.language
+                language_field = capabilities['language_field']
+                if language_field == 'languages':
+                    languages = self.language if isinstance(self.language, (list, tuple)) else [self.language]
+                    transcription_config[language_field] = list(languages)
+                else:
+                    transcription_config[language_field] = self.language
 
-            is_realtime_whisper = model == 'gpt-realtime-whisper'
-            if is_realtime_whisper:
+            if capabilities['supports_prompt'] and self.instructions:
+                transcription_config['prompt'] = self.instructions
+
+            if capabilities['supports_keywords'] and self.keywords:
+                transcription_config['keywords'] = list(self.keywords)
+
+            if capabilities['supports_delay']:
                 transcription_config['delay'] = self._validated_transcription_delay()
 
             session_data = {
@@ -208,7 +225,7 @@ class RealtimeClient(WebSocketRealtimeClientBase):
                             'rate': 24000
                         },
                         'transcription': transcription_config,
-                        'turn_detection': None if is_realtime_whisper else {
+                        'turn_detection': None if capabilities['manual_commit'] else {
                             'type': 'server_vad',
                             'threshold': 0.5,
                             'prefix_padding_ms': 300,
@@ -256,7 +273,7 @@ class RealtimeClient(WebSocketRealtimeClientBase):
             self._send_session_update()
 
     def set_transcription_delay(self, delay: str):
-        """Set gpt-realtime-whisper transcription delay."""
+        """Set the supported realtime transcription model delay."""
         self.transcription_delay = self._normalize_transcription_delay(delay)
         if self.connected:
             self._send_session_update()

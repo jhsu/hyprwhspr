@@ -75,6 +75,8 @@ class ConfigManager:
             'audio_device_model_id': None,  # USB model ID (most stable, from udev)
             'model': 'base',
             'language': None,       # Language code for transcription (None = auto-detect, or 'en', 'nl', 'fr', etc.)
+            'realtime_languages': None,  # Optional language hints for gpt-live-transcribe (e.g., ['en', 'fr'])
+            'realtime_keywords': [],  # Optional keyword hints for gpt-live-transcribe
             'word_overrides': {'hyper whisper': 'hyprwhspr'},  # {"original": "replacement"}
             'filter_filler_words': False,  # Remove common filler words (uh, um, er, etc.)
             'filler_words': ['uh', 'um', 'er', 'ah', 'eh', 'hmm', 'hm', 'mm', 'mhm'],  # Filler words to remove
@@ -126,12 +128,12 @@ class ConfigManager:
             'rest_audio_format': 'wav',        # Audio format for remote transcription
             # WebSocket realtime backend settings
             'websocket_provider': None,        # Provider identifier for credential lookup (e.g., 'openai', 'google', 'elevenlabs')
-            'websocket_model': None,           # Model identifier (e.g., 'gpt-realtime-whisper')
+            'websocket_model': None,           # Model identifier (e.g., 'gpt-live-transcribe')
             'websocket_url': None,             # Optional: explicit WebSocket URL (auto-derived if None)
             'realtime_timeout': 30,            # Completion timeout (seconds)
             'realtime_buffer_max_seconds': 5,  # Max buffer before dropping chunks
             'realtime_mode': 'transcribe',      # 'transcribe' (speech-to-text) or 'converse' (voice-to-AI)
-            'realtime_transcription_delay': 'low',  # gpt-realtime-whisper delay: minimal|low|medium|high|xhigh
+            'realtime_transcription_delay': 'low',  # OpenAI realtime transcription delay: minimal|low|medium|high|xhigh
             # whisper.cpp (pywhispercpp) backend settings
             'pywhispercpp_use_vad': False,               # Native Silero VAD (strips silence, reduces hallucinations); auto-downloads ~1MB ggml-silero model when enabled
             # ONNX-ASR backend settings (CPU-optimized)

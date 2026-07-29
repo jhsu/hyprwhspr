@@ -113,6 +113,18 @@
       "default": null,
       "description": "Language code for transcription (null = auto-detect, or 'en', 'nl', 'fr', etc.)"
     },
+    "realtime_languages": {
+      "type": ["array", "null"],
+      "items": { "type": "string" },
+      "default": null,
+      "description": "Language hints for OpenAI gpt-live-transcribe; when set, these replace the singular language setting"
+    },
+    "realtime_keywords": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Keyword hints for OpenAI gpt-live-transcribe"
+    },
     "word_overrides": {
       "type": "object",
       "additionalProperties": {
@@ -286,7 +298,7 @@
     "websocket_model": {
       "type": ["string", "null"],
       "default": null,
-      "description": "Model identifier for WebSocket backend (e.g., 'gpt-realtime-whisper', 'gemini-3.1-flash-live-preview')"
+      "description": "Model identifier for WebSocket backend (e.g., 'gpt-live-transcribe', 'gemini-3.1-flash-live-preview')"
     },
     "websocket_url": {
       "type": ["string", "null"],
@@ -315,7 +327,7 @@
       "type": "string",
       "enum": ["minimal", "low", "medium", "high", "xhigh"],
       "default": "low",
-      "description": "Latency/accuracy delay setting for OpenAI gpt-realtime-whisper transcription"
+      "description": "Latency/accuracy delay setting for OpenAI realtime transcription models"
     },
     "pywhispercpp_use_vad": {
       "type": "boolean",

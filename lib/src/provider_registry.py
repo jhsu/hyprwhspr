@@ -17,6 +17,13 @@ PROVIDERS: Dict[str, Dict] = {
         'api_key_prefix': 'sk-',
         'api_key_description': 'OpenAI API key (starts with sk-)',
         'models': {
+            'gpt-live-transcribe': {
+                'name': 'GPT Live Transcribe',
+                'description': 'Current low-latency streaming transcription model',
+                'body': {'model': 'gpt-live-transcribe'},
+                'realtime_model': True,
+                'hidden': True
+            },
             'gpt-4o-transcribe': {
                 'name': 'GPT-4o Transcribe',
                 'description': 'Latest model with best accuracy',

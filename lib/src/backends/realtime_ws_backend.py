@@ -20,10 +20,12 @@ try:
     from ..backend_utils import normalize_backend
     from ..credential_manager import get_credential
     from ..provider_registry import get_provider
+    from ..realtime_model_capabilities import get_realtime_model_capabilities
 except ImportError:
     from backend_utils import normalize_backend
     from credential_manager import get_credential
     from provider_registry import get_provider
+    from realtime_model_capabilities import get_realtime_model_capabilities
 
 from .base import TranscriptionBackend
 
@@ -195,8 +197,9 @@ class RealtimeWsBackend(TranscriptionBackend):
 
             # Initialize RealtimeClient with mode
             realtime_mode = self.config.get_setting('realtime_mode', 'transcribe')
-            if provider_id == 'openai' and model_id == 'gpt-realtime-whisper' and realtime_mode != 'transcribe':
-                print('ERROR: gpt-realtime-whisper is supported only with realtime_mode="transcribe"', flush=True)
+            capabilities = get_realtime_model_capabilities(model_id)
+            if provider_id == 'openai' and capabilities['transcription_only'] and realtime_mode != 'transcribe':
+                print(f'ERROR: {model_id} is supported only with realtime_mode="transcribe"', flush=True)
                 return False
             self._realtime_client = RealtimeClient(mode=realtime_mode)
 
@@ -222,13 +225,20 @@ class RealtimeWsBackend(TranscriptionBackend):
                 instructions_parts.append(whisper_prompt)
 
             language = self.config.get_setting('language', None)
-            if language:
+            realtime_languages = self.config.get_setting('realtime_languages', None)
+            if capabilities['language_field'] == 'languages' and isinstance(realtime_languages, list):
+                self._realtime_client.language = realtime_languages or language
+            else:
+                self._realtime_client.language = language
+            if language and not capabilities['supports_prompt']:
                 instructions_parts.append(f"Transcribe in {language} language.")
 
             instructions = ' '.join(instructions_parts) if instructions_parts else None
 
             # Set language in realtime client (for session.update)
-            self._realtime_client.language = language
+            if capabilities['supports_keywords']:
+                keywords = self.config.get_setting('realtime_keywords', [])
+                self._realtime_client.keywords = keywords if isinstance(keywords, list) else []
 
             delay = self.config.get_setting('realtime_transcription_delay', 'low')
             self._realtime_client.set_transcription_delay(delay)
@@ -432,9 +442,9 @@ class RealtimeWsBackend(TranscriptionBackend):
                 and self.config.get_setting('mic_osd_pill_transcript_enabled', False)
             )
 
-        # Waveform: only gpt-realtime-whisper supports this today.
+        # Waveform: OpenAI models with streaming transcription deltas support this.
         if provider_id == 'openai':
-            return model_id == 'gpt-realtime-whisper'
+            return get_realtime_model_capabilities(model_id)['supports_partial_preview']
 
         return False
 
