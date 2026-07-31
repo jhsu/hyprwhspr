@@ -84,6 +84,16 @@ class RealtimeClientTests(unittest.TestCase):
             },
         )
 
+    def test_gpt_live_transcribe_uses_manual_commit_after_stop(self):
+        client = self._client_with_ws("gpt-live-transcribe")
+
+        client._request_transcript({"buffer_was_committed": False})
+
+        self.assertEqual(
+            [payload["type"] for payload in client.ws.sent],
+            ["input_audio_buffer.commit"],
+        )
+
     def test_gpt_live_transcribe_uses_standard_transcription_events(self):
         client = self._client_with_ws("gpt-live-transcribe")
         client._handle_event(
@@ -100,6 +110,45 @@ class RealtimeClientTests(unittest.TestCase):
         )
 
         self.assertEqual(client.commit_and_get_text(timeout=0.1), "hello world")
+
+    def test_gpt_live_transcribe_forwards_vad_and_delta_events_to_hook(self):
+        client = self._client_with_ws("gpt-live-transcribe")
+        client._streaming_hook = mock.Mock()
+        client._stream_session_id = "session-1"
+
+        client._handle_event({"type": "input_audio_buffer.speech_started"})
+        client._handle_event(
+            {
+                "type": "conversation.item.input_audio_transcription.delta",
+                "delta": "hello",
+            }
+        )
+        client._handle_event({"type": "input_audio_buffer.speech_stopped"})
+        client._handle_event(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "transcript": "hello",
+            }
+        )
+
+        events = [call.args[0] for call in client._streaming_hook.send.call_args_list]
+        self.assertEqual(
+            [event["event"] for event in events],
+            ["speech_started", "delta", "speech_stopped", "completed"],
+        )
+        self.assertEqual(events[1]["text"], "hello")
+        self.assertEqual(events[2]["text"], "hello")
+        self.assertEqual(events[3]["text"], "hello")
+
+    def test_discard_does_not_start_a_new_hook_session(self):
+        client = self._client_with_ws("gpt-live-transcribe")
+        client._streaming_hook = mock.Mock()
+        client._stream_session_id = "session-1"
+
+        client.clear_audio_buffer(start_session=False)
+
+        client._streaming_hook.start.assert_not_called()
+        client._streaming_hook.send.assert_not_called()
 
     def test_non_whisper_transcription_session_keeps_vad_and_configured_model(self):
         client = self._client_with_ws("gpt-4o-mini-transcribe")

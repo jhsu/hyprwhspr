@@ -91,6 +91,8 @@ class ConfigManager:
             # Empty stdout leaves text unchanged (observer-only hooks).
             # Null disables the hook.
             'post_transcription_hook': None,
+            # Long-lived JSONL observer for realtime transcript/VAD events.
+            'realtime_transcription_hook': None,
             'clipboard_behavior': False,  # Boolean: true = clear clipboard after delay, false = keep (current behavior)
             'clipboard_clear_delay': 5.0,  # Float: seconds to wait before clearing clipboard (only used if clipboard_behavior is true)
             # Values: "super" | "ctrl_shift" | "ctrl" | null (auto-detect)

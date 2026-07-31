@@ -4,6 +4,7 @@ Provider-agnostic design, use whatever.
 """
 
 import json
+import uuid
 from collections import deque
 from typing import Optional
 
@@ -16,6 +17,11 @@ try:
     from .realtime_model_capabilities import get_realtime_model_capabilities
 except ImportError:
     from realtime_model_capabilities import get_realtime_model_capabilities
+
+try:
+    from .realtime_transcription_hook import RealtimeTranscriptionHook
+except ImportError:
+    from realtime_transcription_hook import RealtimeTranscriptionHook
 
 
 class RealtimeClient(WebSocketRealtimeClientBase):
@@ -36,6 +42,9 @@ class RealtimeClient(WebSocketRealtimeClientBase):
         self.partial_transcript_callback = None
         self.keywords = []
         self.sample_rate = 24000  # OpenAI Realtime API requires 24kHz
+        self._streaming_hook = None
+        self._stream_session_id = None
+        self._stream_turn_id = 0
 
         # Track if buffer was committed (by VAD or manual)
         # Prevents double-commit error when VAD auto-commits on speech end
@@ -123,6 +132,7 @@ class RealtimeClient(WebSocketRealtimeClientBase):
             with self.lock:
                 if not transcript:
                     transcript = self._partial_transcript.strip()
+                completed_text = transcript
                 if transcript:
                     self._committed_segments.append(transcript)
                 self._transcript_generation += 1
@@ -131,6 +141,12 @@ class RealtimeClient(WebSocketRealtimeClientBase):
                 # Keep legacy fields coherent
                 self.current_response_text = transcript
                 self.response_complete = True
+            self._notify_stream_event(
+                'completed',
+                text=completed_text,
+                item_id=event.get('item_id'),
+                turn_id=self._stream_turn_id,
+            )
             self._notify_partial_transcript("")
             self.response_event.set()
             self._log(f'Transcription completed ({len(transcript)} chars)')
@@ -143,6 +159,13 @@ class RealtimeClient(WebSocketRealtimeClientBase):
                 with self.lock:
                     self._partial_transcript += delta
                     partial = self._partial_transcript
+                self._notify_stream_event(
+                    'delta',
+                    delta=delta,
+                    text=partial,
+                    item_id=event.get('item_id'),
+                    turn_id=self._stream_turn_id,
+                )
                 self._notify_partial_transcript(partial)
 
         elif event_type == 'input_audio_buffer.committed':
@@ -158,10 +181,21 @@ class RealtimeClient(WebSocketRealtimeClientBase):
                 self._buffer_committed = False
                 self._partial_transcript = ""
                 self._track_item_locked(event)
+                self._stream_turn_id += 1
+                turn_id = self._stream_turn_id
+            self._notify_stream_event('speech_started', turn_id=turn_id)
             self._notify_partial_transcript("")
 
         elif event_type == 'input_audio_buffer.speech_stopped':
             self._log('Speech ended')
+            with self.lock:
+                partial = self._partial_transcript.strip()
+                turn_id = self._stream_turn_id
+            self._notify_stream_event(
+                'speech_stopped',
+                text=partial,
+                turn_id=turn_id,
+            )
 
         elif event_type == 'error':
             error = event.get('error', {})
@@ -172,6 +206,7 @@ class RealtimeClient(WebSocketRealtimeClientBase):
             self._notify_partial_transcript("")
             self.response_complete = True
             self.response_event.set()  # Unblock waiting thread
+            self._notify_stream_event('error', message=error_message)
 
     def _track_item_locked(self, event: dict):
         """Record the conversation item id for the current take (call under lock)."""
@@ -306,8 +341,14 @@ class RealtimeClient(WebSocketRealtimeClientBase):
     # Commit hooks
     # ------------------------------------------------------------------
 
-    def clear_audio_buffer(self):
-        """Clear the server-side audio buffer before starting a new recording."""
+    def clear_audio_buffer(self, start_session=True):
+        """Clear audio; optionally begin a new logical hook session."""
+        if start_session:
+            self._stream_session_id = uuid.uuid4().hex
+            self._stream_turn_id = 0
+            if self._streaming_hook:
+                self._streaming_hook.start()
+                self._notify_stream_event('session_started')
         with self.lock:
             # Retire the previous take's items so late transcripts are dropped
             self._retired_item_ids.extend(self._session_item_ids)
@@ -325,6 +366,43 @@ class RealtimeClient(WebSocketRealtimeClientBase):
             self._notify_partial_transcript("")
         except Exception as e:
             self._log(f'Failed to clear buffer: {e}')
+
+    def set_streaming_hook(self, command: Optional[str], env=None):
+        """Configure the optional long-lived JSONL realtime observer hook."""
+        if self._streaming_hook:
+            self._streaming_hook.stop()
+        self._streaming_hook = (
+            RealtimeTranscriptionHook(command, env=env) if command else None
+        )
+
+    def _notify_stream_event(self, event: str, **fields):
+        if not self._streaming_hook or not self._stream_session_id:
+            return
+        payload = {
+            'version': 1,
+            'event': event,
+            'session_id': self._stream_session_id,
+        }
+        payload.update({key: value for key, value in fields.items() if value is not None})
+        self._streaming_hook.send(payload)
+
+    def finish_streaming_hook(self, text: str):
+        """Publish the aggregate text returned for the current flush."""
+        self._notify_stream_event('final', text=text or '')
+
+    def cancel_streaming_hook(self):
+        """Publish cancellation without terminating the reusable hook process."""
+        self._notify_stream_event('cancelled')
+
+    def close_streaming_hook(self):
+        """Terminate the hook process during backend shutdown."""
+        if self._streaming_hook:
+            self._streaming_hook.stop()
+            self._streaming_hook = None
+
+    def close(self):
+        self.close_streaming_hook()
+        super().close()
 
     def _on_commit_fast_path_locked(self):
         self._buffer_committed = False

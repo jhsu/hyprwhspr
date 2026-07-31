@@ -203,6 +203,13 @@ class RealtimeWsBackend(TranscriptionBackend):
                 return False
             self._realtime_client = RealtimeClient(mode=realtime_mode)
 
+            hook_command = self.config.get_setting('realtime_transcription_hook', None)
+            hook_env = {
+                'HYPRWHSPR_MODEL': model_id,
+                'HYPRWHSPR_BACKEND': 'realtime-ws',
+            }
+            self._realtime_client.set_streaming_hook(hook_command, env=hook_env)
+
             # Get WebSocket URL
             websocket_url = self.config.get_setting('websocket_url')
             if not websocket_url:
@@ -372,6 +379,7 @@ class RealtimeWsBackend(TranscriptionBackend):
             
             # Commit and get text (audio was already streamed via callback)
             transcription = self._realtime_client.commit_and_get_text(timeout=timeout)
+            self._realtime_client.finish_streaming_hook(transcription.strip())
             
             return transcription.strip()
             
@@ -512,7 +520,8 @@ class RealtimeWsBackend(TranscriptionBackend):
         """Drop buffered audio client- and server-side; keep the connection alive."""
         if self._realtime_client:
             try:
-                self._realtime_client.clear_audio_buffer()
+                self._realtime_client.cancel_streaming_hook()
+                self._realtime_client.clear_audio_buffer(start_session=False)
                 self._clear_realtime_partial_preview()
             except Exception as e:
                 print(f'[REALTIME] Failed to discard audio: {e}', flush=True)

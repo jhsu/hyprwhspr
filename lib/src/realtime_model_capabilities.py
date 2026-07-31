@@ -30,6 +30,8 @@ REALTIME_TRANSCRIPTION_CAPABILITIES = {
     'gpt-live-transcribe': {
         'language_field': 'languages',
         'supports_delay': True,
+        # The API currently rejects server_vad for this transcription model.
+        # Keep turn boundaries under hyprwhspr's explicit stop/commit flow.
         'manual_commit': True,
         'supports_prompt': True,
         'supports_keywords': True,

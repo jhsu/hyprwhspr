@@ -636,8 +636,10 @@ Two modes available (set `realtime_mode` in your config):
 
 `gpt-live-transcribe` is the current OpenAI streaming transcription model. It
 uses the transcription WebSocket session and supports incremental transcript
-deltas, configurable latency, prompts, and language hints. The existing
-When `realtime_languages` is set, it is used explicitly instead of the
+deltas, configurable latency, prompts, and language hints. hyprwhspr commits
+the audio explicitly when recording stops because the API currently rejects
+server-side turn detection for this model. When `realtime_languages` is set,
+it is used explicitly instead of the
 singular `language` setting. If it is omitted, `language` is sent as a
 one-item list. Use `realtime_keywords` for literal terms that may occur in
 the audio.
@@ -1030,6 +1032,39 @@ Two environment variables are exported to the hook:
 The hook runs under a 5-second timeout. Exit status `77` is reserved for an intentional consume result; stdout is ignored and the transcription is not pasted. On timeout, any other non-zero exit, or any subprocess error, the original text is preserved — a broken hook will never silently eat a dictation. Errors are logged to the service journal.
 
 Note: the command runs under `shell=True`, so pipes, redirects, and command chaining work as expected. Treat `post_transcription_hook` as trusted config (same threat model as the rest of `config.json`).
+
+### Realtime transcription hook
+
+For `gpt-live-transcribe`, `realtime_transcription_hook` runs a long-lived
+observer command and sends newline-delimited JSON while recording. It receives
+partial deltas and, when the provider supplies them, turn boundaries; it cannot
+transform or consume the text pasted by hyprwhspr. OpenAI's
+`gpt-live-transcribe` currently requires an explicit commit when recording
+stops and does not provide server-VAD boundaries.
+
+```jsonc
+{
+    "realtime_transcription_hook": "~/.local/bin/hyprwhspr-realtime-hook"
+}
+```
+
+Events may include `session_started`, `speech_started`, `delta`,
+`speech_stopped`, `completed`, `final`, `cancelled`, and `error`. Every event
+contains `version: 1` and a `session_id`; delta and completed events also carry
+the current text. The hook receives `HYPRWHSPR_MODEL` and
+`HYPRWHSPR_BACKEND` environment variables. Its stdout is discarded, and a
+failed hook never interrupts transcription. Events are queued asynchronously;
+if the observer falls behind, intermediate `delta` events may be dropped, but
+the audio/transcription path is never blocked.
+
+Example hook:
+
+```bash
+#!/bin/sh
+while IFS= read -r event; do
+    printf '%s\n' "$event" >> "$HOME/.local/state/hyprwhspr/realtime-events.jsonl"
+done
+```
 
 ## Integrations
 
